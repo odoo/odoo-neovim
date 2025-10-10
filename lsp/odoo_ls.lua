@@ -8,7 +8,7 @@ local odoo_ls_locations = {
 local executable = ''
 
 for _, location in ipairs(odoo_ls_locations) do
-    if vim.fn.executable(location) then
+    if vim.fn.executable(location) == 1 then
         executable = location
     end
 end
