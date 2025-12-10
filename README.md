@@ -1,82 +1,101 @@
 # Neovim
 
-Neovim client for the Odools language server
+Neovim client for the [odoo-ls](https://github.com/odoo/odoo-ls) language server
 
 ![screenshot](https://i.imgur.com/wuqsF9q.png)
 
-## Important ⚠️
+## Important
+
 This plugin is still in its early development stage. Don't hesitate to submit bugs, issues and/or
 feedbacks to improve the user experience.
 
-This repository give some snippet example to make the [odoo-ls](https://github.com/odoo/odoo-ls)
-working inside Neovim.
-
-This will later become a true plugin managing the download of the server executable and dependencies
-
 ## Requirements
-We recommend using nvim version `0.11.0` or later to benefit from the builtin lsp config helpers.
-Working with `< 0.11` will require installing [lspconfig](https://github.com/neovim/nvim-lspconfig)
 
-## Instalation
-For now the language server is not included in the plugin. The plugin defines the config for neovim.
-First download the [language server releases](https://github.com/odoo/odoo-ls/releases). 
-The plugin will search for the server either directly on the path or inside the 
-"$HOME/.local/share/nvim/odoo/odoo_ls_server" folder. For custom locations, the 
-config will need to be update as in the [config section](#lspconfiglua-custom-config)
+- Neovim `>= 0.11.0`
+- `curl` (for downloading the server and typeshed)
+- `tar` / `unzip` (for extracting release assets)
 
-Additionally, the server requires the [python typeshed](https://github.com/python/typeshed).
-The server will look for the stdlib either in the same folder as the server binary
-or in the current working directory. Otherwise the stdlib can be configured both in the
-[odools.toml](#odoolstoml) or [config](#lspconfiglua-custom-config)
+## Installation
+
+### lazy.nvim
+```lua
+{
+    'odoo/odoo-neovim',
+    config = function()
+        require('odoo_ls').setup()
+    end
+}
+```
+
+The plugin will automatically download the latest `odoo_ls_server` binary and
+typeshed from [GitHub releases](https://github.com/odoo/odoo-ls/releases) on
+launch. Both are installed into `vim.fn.stdpath('data') .. '/odoo'`
+(typically `~/.local/share/nvim/odoo/`).
+
+If the plugin can detect a server is already on installed either in `PATH`
+or `vim.fn.stdpath('data') .. '/odoo'`, the plugin will use that existing
+installation instead of downloading a new one.
+
+On launch the plugin will check whether a new version of the server was
+released. The latest version can be downloaded through the plugin using 
+the `OdooLsInstall` command. This will remove the odoo_ls_server installed
+under `vim.fn.stdpath('data') .. '/odoo_ls_server'` and create a new symlink
+for the newest version to that path. The next time neovim is launched it will
+pick up and use the newly installed version.
+
+### Commands
+
+| Command                      | Description                                                                                |
+|------------------------------|--------------------------------------------------------------------------------------------|
+| `:OdooLsInstall`             | Download and install the server + typeshed using the configured `version` channel          |
+| `:OdooLsInstall stable`      | Install the latest stable release                                                          |
+| `:OdooLsInstall latest`      | Install the latest release of any kind (including prereleases)                             |
+| `:OdooLsInstall <tag>`       | Install a specific release tag (e.g. `:OdooLsInstall 1.2.1`)                               |
+
+## Plugin options
+
+Options are passed to `setup()`:
+
+```lua
+require('odoo_ls').setup({
+    checkVersion = true,   -- check for updates on startup (default: true)
+    checkFrequency = 24,   -- hours between update checks (default: 24)
+    profile = 'main',      -- the profile defined in odoo.toml (default: 'main')
+    version = 'stable',    -- release channel to install/check (default: 'stable')
+})
+```
+
+| Option           | Type    | Default    | Description                                                                                                             |
+|------------------|---------|------------|-------------------------------------------------------------------------------------------------------------------------|
+| `checkVersion`   | boolean | `true`     | Check for a newer release on startup                                                                                    |
+| `checkFrequency` | number  | `24`       | Minimum hours between version checks                                                                                    |
+| `profile`        | string  | `'main'`   | The odoo.toml profile to be used by the server                                                                          |
+| `version`        | string  | `'stable'` | Release channel (`'stable'` — latest stable, `'latest'` — incl. prereleases) or a specific release tag (e.g. `'1.2.1'`) |
+
+Update checks only run when `version` is `'stable'` or `'latest'`. A pinned tag
+(e.g. `version = '1.2.1'`) disables periodic update notifications.
 
 ## Configs
 
-There are 2 configuration parts needed. One for the server directly, and one for neovim. 
-
-The odools.toml file should be included in the root of you working directory and define the
-addons, stubs and python path (if you need to use a different python executable such as a 
-the one from a virtual environment). 
+The odools.toml file should be included in the root of your working directory and define the
+addons, stubs and python path (if you need to use a different python executable such as
+the one from a virtual environment).
 
 ### odools.toml
- ```toml
+```toml
 name = "main"
 odoo_path = "odoo"
 addons_paths = ["/home/user/src/enterprise"]
 python_path = "/home/user/.pyenv/shims/python"
-additional_stubs = ["/home/user/.local/nvim/odoo/typeshed/stubs"]
+additional_stubs = ["/home/user/.local/share/nvim/odoo/typeshed/stubs"]
 ```
 
-You can import the odoo-nvim plugin to provide a default setting for the odoo_ls.
+### Server CLI arguments
 
-### lazy.lua
-```lua
-    {'odoo/odoo-neovim'}
-```
+The server supports additional CLI arguments documented in
+[args.rs](https://github.com/odoo/odoo-ls/blob/release/server/src/args.rs).
+Notable ones:
 
-### lspconfig.lua (in nvim >0.11)
-```lua
-vim.lsp.config("odoo_ls", {
-    -- custom config if needed
-    })
-
-vim.lsp.enable({"odoo_ls"})
-```
-
-The config can be customised depending on the needs. Multiple commands exist and can
-be found on the [cli page of the server](https://github.com/odoo/odoo-ls/blob/release/server/src/args.rs).
-But for setup reasons some notable ones are:
-- --config-path - a specific path where to find the odools.toml
-- --stdlib - give an alternative path to stdlib stubs from typeshed
-
-### lspconfig.lua custom config
-```lua
-vim.lsp.config("odoo_ls", {
-    cmd = {
-        -- Path to the odoo_ls_server binary
-        vim.fn.expand('$HOME/.local/share/nvim/odoo/odoo_ls_server'),
-        '--config-path',
-        'Path_to_toml/odools.toml',
-        '--stdlib',
-        'path_to_typeshed/stdlib',
-    })
-```
+- `--config-path` — path to an `odools.toml` file
+- `--stdlib` — alternative path to stdlib stubs from typeshed (automatically set by the plugin to the stdlib
+in the typeshed bundled in the release)
