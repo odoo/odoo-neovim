@@ -41,7 +41,7 @@ the one from a virtual environment).
  ```toml
 name = "main"
 odoo_path = "odoo"
-addons_path = ["/home/user/src/enterprise"]
+addons_paths = ["/home/user/src/enterprise"]
 python_path = "/home/user/.pyenv/shims/python"
 additional_stubs = ["/home/user/.local/nvim/odoo/typeshed/stubs"]
 ```
