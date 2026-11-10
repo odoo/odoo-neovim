@@ -1,82 +1,129 @@
-# Neovim
+# odoo-neovim
 
-Neovim client for the Odools language server
+A Neovim client for the [odoo-ls](https://github.com/odoo/odoo-ls) language
+server. It launches the binary, answers the server's configuration request and
+handles its `$Odoo/*` notifications. The real configuration lives in
+`odools.toml`, read by the server, and the client adds no keymaps or UI of its
+own.
 
-![screenshot](https://i.imgur.com/wuqsF9q.png)
+Inside Neovim, the full reference is `:help odoo_ls`.
 
-## Important ⚠️
-This plugin is still in its early development stage. Don't hesitate to submit bugs, issues and/or
-feedbacks to improve the user experience.
-
-This repository give some snippet example to make the [odoo-ls](https://github.com/odoo/odoo-ls)
-working inside Neovim.
-
-This will later become a true plugin managing the download of the server executable and dependencies
+![Field completion with types and documentation while typing in an Odoo model](doc/assets/completion.png)
 
 ## Requirements
-We recommend using nvim version `0.11.0` or later to benefit from the builtin lsp config helpers.
-Working with `< 0.11` will require installing [lspconfig](https://github.com/neovim/nvim-lspconfig)
 
-## Instalation
-For now the language server is not included in the plugin. The plugin defines the config for neovim.
-First download the [language server releases](https://github.com/odoo/odoo-ls/releases). 
-The plugin will search for the server either directly on the path or inside the 
-"$HOME/.local/share/nvim/odoo/odoo_ls_server" folder. For custom locations, the 
-config will need to be update as in the [config section](#lspconfiglua-custom-config)
+- Neovim **0.12+**.
+- `odoo_ls_server` and its typeshed stubs from the
+  [odoo-ls releases](https://github.com/odoo/odoo-ls/releases).
 
-Additionally, the server requires the [python typeshed](https://github.com/python/typeshed).
-The server will look for the stdlib either in the same folder as the server binary
-or in the current working directory. Otherwise the stdlib can be configured both in the
-[odools.toml](#odoolstoml) or [config](#lspconfiglua-custom-config)
+## Install
 
-## Configs
+Download the release archive for your platform and `typeshed.zip` from the
+[odoo-ls releases](https://github.com/odoo/odoo-ls/releases). Extract the
+archive, then extract `typeshed.zip` into a `typeshed/` directory next to the
+`odoo_ls_server` binary, where the server looks for it. Put the binary on your
+`PATH`, or pass its path as the `cmd` option.
 
-There are 2 configuration parts needed. One for the server directly, and one for neovim. 
+With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
-The odools.toml file should be included in the root of you working directory and define the
-addons, stubs and python path (if you need to use a different python executable such as a 
-the one from a virtual environment). 
+```lua
+{
+  'odoo/odoo-neovim',
+  ft = { 'python', 'xml', 'csv', 'javascript', 'typescript' },
+  cmd = 'OdooLs',  -- lazy-loads on this command, unrelated to the server's cmd
+  opts = {},  -- must be set, even empty, for lazy.nvim to call setup()
+}
+```
 
-### odools.toml
- ```toml
-name = "main"
-odoo_path = "odoo"
+With the binary outside `PATH`:
+
+```lua
+opts = { cmd = { '/abs/path/to/odoo_ls_server' } },
+```
+
+Options (all optional):
+
+```lua
+require('odoo_ls').setup({
+  profile = 'default',  -- odools.toml profile to select
+  cmd = { '/abs/path/to/odoo_ls_server' },  -- not needed when odoo_ls_server is on PATH
+})
+```
+
+`setup()` is optional: a plain `vim.lsp.enable('odoo_ls')` uses the
+`lsp/odoo_ls.lua` spec as is.
+
+## Configuration
+
+The client attaches only to files under an `odools.toml`, and that file's
+directory becomes the workspace folder. Neovim runs a single server, which
+buffers under another `odools.toml` join. Put it in the directory that holds both
+odoo and enterprise. Each profile is a `[[config]]` table:
+
+```toml
+#:schema https://github.com/odoo/odoo-ls/releases/download/1.6.1/config_schema.json
+
+[[config]]
+name = "default"
+odoo_path = "/home/user/src/odoo"
 addons_paths = ["/home/user/src/enterprise"]
 python_path = "/home/user/.pyenv/shims/python"
-additional_stubs = ["/home/user/.local/nvim/odoo/typeshed/stubs"]
 ```
 
-You can import the odoo-nvim plugin to provide a default setting for the odoo_ls.
+See the [odoo-ls repository](https://github.com/odoo/odoo-ls) for every key.
+The client only chooses the profile (`"default"` unless set, `"Disabled"` makes
+the server idle) and the launch command, also settable the standard way:
 
-### lazy.lua
 ```lua
-    {'odoo/odoo-neovim'}
+vim.lsp.config('odoo_ls', {
+  cmd = { '/abs/path/to/odoo_ls_server' },
+  settings = { Odoo = { selectedProfile = 'My Setup' } },
+})
 ```
 
-### lspconfig.lua (in nvim >0.11)
-```lua
-vim.lsp.config("odoo_ls", {
-    -- custom config if needed
-    })
+## Commands
 
-vim.lsp.enable({"odoo_ls"})
-```
+| Command           | Action                                                     |
+| ----------------- | ---------------------------------------------------------- |
+| `:OdooLs health`  | Run `:checkhealth odoo_ls` (default when run bare).        |
+| `:OdooLs profile` | Pick a profile via `vim.ui.select` and restart the server. |
+| `:OdooLs restart` | Restart the server, re-attaching current buffers.          |
+| `:OdooLs logs`    | Open the newest server log file.                           |
 
-The config can be customised depending on the needs. Multiple commands exist and can
-be found on the [cli page of the server](https://github.com/odoo/odoo-ls/blob/release/server/src/args.rs).
-But for setup reasons some notable ones are:
-- --config-path - a specific path where to find the odools.toml
-- --stdlib - give an alternative path to stdlib stubs from typeshed
+![:OdooLs profile - vim.ui.select with the active profile marked](doc/assets/profile-picker.png)
 
-### lspconfig.lua custom config
-```lua
-vim.lsp.config("odoo_ls", {
-    cmd = {
-        -- Path to the odoo_ls_server binary
-        vim.fn.expand('$HOME/.local/share/nvim/odoo/odoo_ls_server'),
-        '--config-path',
-        'Path_to_toml/odools.toml',
-        '--stdlib',
-        'path_to_typeshed/stdlib',
-    })
-```
+## Health
+
+`:checkhealth odoo_ls` is the first stop when something looks wrong. It reports
+which binary runs and whether its version matches the plugin, which
+`odools.toml` files the server uses and every key of the active profile,
+buffers outside the workspace, typeshed, file watching, overlapping Python and
+TypeScript servers, and every config and server diagnostic.
+
+![:checkhealth odoo_ls with the active profile section](doc/assets/health.png)
+
+## Known limitations
+
+- **File watching is off on Linux.** Neovim disables it there by default, so a
+  `git pull` or branch switch is not seen by the server. Run `:OdooLs restart`,
+  or see `:help odoo_ls-limitations` to opt in.
+- **`odools.toml` is not watched.** Edits made outside Neovim need a restart.
+- **Position encoding is utf-16 only**, so the client can share buffers with
+  lemminx and other utf-16 servers.
+
+## Versioning
+
+Versions follow the odoo-ls server: each server release gets a plugin release
+with the same number, even when the client is unchanged. Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
+
+### Upgrading from the old snippet config
+
+1.6.1 changes defaults the snippet relied on: the selected profile is now
+`default` (was `main`), the client attaches only under an `odools.toml`, and
+that file must hold its keys in a `[[config]]` table. See the Breaking section
+of the [CHANGELOG](CHANGELOG.md).
+
+## License
+
+LGPL-3.0, the same as the language server.
