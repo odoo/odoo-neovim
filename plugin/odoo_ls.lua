@@ -19,10 +19,13 @@ local subcommands = {
   logs = function()
     require('odoo_ls.api').open_logs()
   end,
+  health = function()
+    vim.cmd.checkhealth('odoo_ls')
+  end,
 }
 
 vim.api.nvim_create_user_command('OdooLs', function(cmd)
-  local sub = cmd.fargs[1]
+  local sub = cmd.fargs[1] or 'health'
   local fn = subcommands[sub]
   if fn then
     fn(unpack(cmd.fargs, 2))
@@ -30,7 +33,7 @@ vim.api.nvim_create_user_command('OdooLs', function(cmd)
     vim.notify('odoo_ls: unknown subcommand ' .. sub, vim.log.levels.ERROR, { title = 'odoo_ls' })
   end
 end, {
-  nargs = '+',
+  nargs = '*',
   desc = 'odoo-ls language server controls',
   complete = function(arglead, cmdline)
     local parts = vim.split(vim.trim(cmdline), '%s+')

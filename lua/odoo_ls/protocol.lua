@@ -1,4 +1,4 @@
---- Custom `$Odoo/*` notifications of odoo-ls, normalised into the state the API reads.
+--- Custom `$Odoo/*` notifications of odoo-ls, normalised into the state the API and health read.
 local M = {}
 
 local levels = vim.log.levels
@@ -17,7 +17,7 @@ local levels = vim.log.levels
 ---@field crashed boolean
 ---@field crash_info string|nil    full crash text (from panic hook)
 
---- Normalised server state, written only by the handlers below and read by the API.
+--- Normalised server state, written only by the handlers below and read by the API and health.
 ---@type odoo_ls.State
 local state = {
   server_diagnostics = {},
@@ -68,7 +68,7 @@ handlers['$Odoo/restartNeeded'] = function()
   require('odoo_ls.api').restart()
 end
 
--- Full configuration snapshot, read by the API
+-- Full configuration snapshot, read by the API and health
 handlers['$Odoo/setConfiguration'] = function(_, result)
   if type(result) ~= 'table' then
     return

@@ -94,4 +94,72 @@ describe('protocol', function()
     require('odoo_ls.api').select_profile()
     assert.same({ 'odoo_ls is not running' }, notices)
   end)
+
+  describe('health', function()
+    local health = vim.health
+
+    -- Runs the check and returns the calls made from `from` on.
+    local function section(from)
+      local calls = {}
+      vim.health = setmetatable({}, {
+        __index = function(_, kind)
+          return function(msg)
+            table.insert(calls, { kind, msg })
+          end
+        end,
+      })
+      require('odoo_ls.health').check()
+      for i, call in ipairs(calls) do
+        if call[2] == from then
+          return vim.list_slice(calls, i + 1)
+        end
+      end
+    end
+
+    after_each(function()
+      vim.health = health
+      protocol.state.crashed = false
+    end)
+
+    it('lists every key of the profile, marks the defaults and reports every diagnostic', function()
+      assert.same({
+        { 'info', 'addons_paths = ["/w/enterprise", "/w/odoo/addons"]  $workspaceFolder:odoo `/w/src/odools.toml`' },
+        { 'info', 'diagnostic_settings = { OLS01000 = "error" }        `/w/src/odools.toml`' },
+        { 'info', 'file_cache = false                                  `/w/src/odools.toml`' },
+        { 'info', 'odoo_path = "/w/odoo"                               `/w/odools.toml`' },
+        { 'info', 'tsserver_command = "tsserver"                       default' },
+        { 'info', 'other profiles: other' },
+        { 'error', "config [other]: Config profile 'other': odoo_path rejected" },
+        { 'warn', "config [src]: Config profile 'src': unknown key" },
+        { 'warn', 'server: tsserver slow' },
+        { 'info', 'server: indexing' },
+      }, section('odoo_ls: profile src'))
+    end)
+
+    it('lists the config files of every profile', function()
+      local lines = vim.tbl_filter(function(call)
+        return call[1] == 'ok' and call[2]:find('odools.toml in effect', 1, true)
+      end, section('odoo-ls.nvim'))
+      assert.same({ { 'ok', 'odools.toml in effect (3):\n  /w/odools.toml\n  /w/src/odools.toml\n  /x/odools.toml' } }, lines)
+    end)
+
+    it('says only that the client is not running before the server sends its configuration', function()
+      handlers['$Odoo/setPid'](nil, { server_pid = 1 }, { client_id = 1 })
+      local calls = section('odoo-ls.nvim')
+      assert.same({
+        { 'info', 'client not running (it attaches to python/xml/csv/js/ts files under an odools.toml)' },
+        { 'info', 'no configuration received from the server yet' },
+      }, vim.list_slice(calls, #calls - 1))
+    end)
+
+    it('cuts a crash to its first 20 lines', function()
+      local lines = {}
+      for i = 1, 30 do
+        table.insert(lines, 'frame ' .. i)
+      end
+      handlers['Odoo/displayCrashNotification'](nil, { crashInfo = table.concat(lines, '\n') })
+      local crash = section('odoo_ls: profile src')[11]
+      assert.same({ 'error', table.concat(vim.list_slice(lines, 1, 20), '\n') }, crash)
+    end)
+  end)
 end)
