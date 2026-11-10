@@ -14,4 +14,11 @@ return {
   -- utf-16 only because lemminx shares the xml buffers and all clients on a buffer must agree
   capabilities = { general = { positionEncodings = { 'utf-16' } } },
   settings = { Odoo = { selectedProfile = 'default' } },
+  handlers = require('odoo_ls.protocol').handlers,
+  on_exit = function(_, _, client_id)
+    -- on_exit runs in a fast event context, so defer the state reset
+    vim.schedule(function()
+      require('odoo_ls.protocol')._on_exit(client_id)
+    end)
+  end,
 }
