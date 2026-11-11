@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Neovim ${{ matrix.nvim }}
+    # Standard runner only: free on public repositories, unlike larger runners.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported release (see README) and the latest one.
+        nvim: [v0.12.0, stable]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Neovim
+        env:
+          NVIM_VERSION: ${{ matrix.nvim }}
+        run: |
+          curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.tar.gz" \
+            | tar xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Show Neovim version
+        run: nvim --version
+
+      # Clones mini.test from GitHub, then runs each spec file in its own Neovim.
+      - name: Run tests
+        run: nvim -l spec/minit.lua
