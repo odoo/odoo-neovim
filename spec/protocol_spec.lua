@@ -1,3 +1,4 @@
+local eq = MiniTest.expect.equality
 local protocol = require('odoo_ls.protocol')
 local handlers = protocol.handlers
 
@@ -62,9 +63,9 @@ describe('protocol', function()
   end)
 
   it('stores the configuration as the server sent it', function()
-    assert.equal(payload, protocol.state.configuration)
-    assert.same({ 'src', 'other' }, require('odoo_ls.api').profiles())
-    assert.is_true(protocol.state.js)
+    eq(protocol.state.configuration, payload)
+    eq(require('odoo_ls.api').profiles(), { 'src', 'other' })
+    eq(protocol.state.js, true)
   end)
 
   it('forgets the previous server crash and diagnostics when a new server starts', function()
@@ -72,18 +73,18 @@ describe('protocol', function()
     handlers['$Odoo/diagnostic_config'](nil, { action = 'extend', messages = { { level = 2, message = 'late' } } })
     handlers['$Odoo/setPid'](nil, { server_pid = 42 }, { client_id = 7 })
     local st = protocol.state
-    assert.same({ 42, false }, { st.pid, st.crashed })
-    assert.is_nil(st.configuration)
-    assert.same({}, st.server_diagnostics)
+    eq({ st.pid, st.crashed }, { 42, false })
+    eq(st.configuration, nil)
+    eq(st.server_diagnostics, {})
   end)
 
   it('keeps the state of a new server when the client it replaced exits', function()
     handlers['$Odoo/setPid'](nil, { server_pid = 1 }, { client_id = 1 })
     handlers['$Odoo/setPid'](nil, { server_pid = 2 }, { client_id = 2 })
     protocol._on_exit(1)
-    assert.equal(2, protocol.state.pid)
+    eq(protocol.state.pid, 2)
     protocol._on_exit(2)
-    assert.is_nil(protocol.state.pid)
+    eq(protocol.state.pid, nil)
   end)
 
   it('says the server is not running when a profile is picked without a client', function()
@@ -92,7 +93,7 @@ describe('protocol', function()
       table.insert(notices, msg)
     end
     require('odoo_ls.api').select_profile()
-    assert.same({ 'odoo_ls is not running' }, notices)
+    eq(notices, { 'odoo_ls is not running' })
   end)
 
   describe('health', function()
@@ -122,7 +123,7 @@ describe('protocol', function()
     end)
 
     it('lists every key of the profile, marks the defaults and reports every diagnostic', function()
-      assert.same({
+      eq(section('odoo_ls: profile src'), {
         { 'info', 'addons_paths = ["/w/enterprise", "/w/odoo/addons"]  $workspaceFolder:odoo `/w/src/odools.toml`' },
         { 'info', 'diagnostic_settings = { OLS01000 = "error" }        `/w/src/odools.toml`' },
         { 'info', 'file_cache = false                                  `/w/src/odools.toml`' },
@@ -133,23 +134,23 @@ describe('protocol', function()
         { 'warn', "config [src]: Config profile 'src': unknown key" },
         { 'warn', 'server: tsserver slow' },
         { 'info', 'server: indexing' },
-      }, section('odoo_ls: profile src'))
+      })
     end)
 
     it('lists the config files of every profile', function()
       local lines = vim.tbl_filter(function(call)
         return call[1] == 'ok' and call[2]:find('odools.toml in effect', 1, true)
       end, section('odoo-ls.nvim'))
-      assert.same({ { 'ok', 'odools.toml in effect (3):\n  /w/odools.toml\n  /w/src/odools.toml\n  /x/odools.toml' } }, lines)
+      eq(lines, { { 'ok', 'odools.toml in effect (3):\n  /w/odools.toml\n  /w/src/odools.toml\n  /x/odools.toml' } })
     end)
 
     it('says only that the client is not running before the server sends its configuration', function()
       handlers['$Odoo/setPid'](nil, { server_pid = 1 }, { client_id = 1 })
       local calls = section('odoo-ls.nvim')
-      assert.same({
+      eq(vim.list_slice(calls, #calls - 1), {
         { 'info', 'client not running (it attaches to python/xml/csv/js/ts files under an odools.toml)' },
         { 'info', 'no configuration received from the server yet' },
-      }, vim.list_slice(calls, #calls - 1))
+      })
     end)
 
     it('cuts a crash to its first 20 lines', function()
@@ -159,7 +160,7 @@ describe('protocol', function()
       end
       handlers['Odoo/displayCrashNotification'](nil, { crashInfo = table.concat(lines, '\n') })
       local crash = section('odoo_ls: profile src')[11]
-      assert.same({ 'error', table.concat(vim.list_slice(lines, 1, 20), '\n') }, crash)
+      eq(crash, { 'error', table.concat(vim.list_slice(lines, 1, 20), '\n') })
     end)
   end)
 end)

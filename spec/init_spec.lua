@@ -1,11 +1,13 @@
+local eq = MiniTest.expect.equality
+
 describe('odoo_ls', function()
   it('exposes only setup, restart and set_profile', function()
     local odoo_ls = require('odoo_ls')
     local keys = vim.tbl_keys(odoo_ls)
     table.sort(keys)
-    assert.same({ 'restart', 'set_profile', 'setup' }, keys)
+    eq(keys, { 'restart', 'set_profile', 'setup' })
     for _, key in ipairs(keys) do
-      assert.equal('function', type(odoo_ls[key]))
+      eq(type(odoo_ls[key]), 'function')
     end
   end)
 
@@ -26,10 +28,10 @@ describe('odoo_ls', function()
 
     it('launches odoo_ls_server from PATH by default, or the cmd it is given', function()
       require('odoo_ls').setup()
-      assert.same({ 'odoo_ls_server' }, vim.lsp.config.odoo_ls.cmd)
+      eq(vim.lsp.config.odoo_ls.cmd, { 'odoo_ls_server' })
       require('odoo_ls').setup({ cmd = { '/opt/odoo_ls_server', '--log-level', 'info' } })
-      assert.same({ '/opt/odoo_ls_server', '--log-level', 'info' }, vim.lsp.config.odoo_ls.cmd)
-      assert.equal(2, enabled)
+      eq(vim.lsp.config.odoo_ls.cmd, { '/opt/odoo_ls_server', '--log-level', 'info' })
+      eq(enabled, 2)
     end)
   end)
 end)
